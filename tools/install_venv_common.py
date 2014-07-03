@@ -113,7 +113,7 @@ class InstallVenv(object):
 
         # First things first, make sure our venv has the latest pip and
         # setuptools.
-        self.pip_install('pip>=1.3')
+        self.pip_install('pip>=1.3,<=1.4')
         self.pip_install('setuptools')
 
         self.pip_install('-r', self.requirements)
