@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+UTIL_DEPS="python-pip unzip python-software-properties diffutils patch"
+DEV_DEPS="python2.7-dev libxml2-dev libxslt1-dev libmysqlclient-dev \
+  libpq-dev libffi-dev"
+OS_DEPS="python-lxml python-migrate python-netaddr python-novaclient \
+  python-oslo.config python-paramiko python-paste python-pastedeploy \
+  python-routes python-six python-sqlalchemy python-stevedore python-suds \
+  python-swiftclient python-webob python-pbr python-amqplib python-anyjson \
+  python-babel python-eventlet python-glanceclient python-greenlet \
+  python-iso8601 python-keystoneclient python-kombu python-lockfile"
+
+
+install_package() {
+    IS_AVAILABLE=$(dpkg-query --show -f'${Status}\n' $1 || echo $?)
+    # indexed and installed
+    if [[ $IS_AVAILABLE == "install ok installed" ]]; then return 0; fi
+    # not installed
+    sudo apt-get -y --force-yes install $1 && \
+    echo -e "\nsudo apt-get -y remove $1" >> ${2:-/dev/null}; return $?
+}
+
+if [ $# -eq 0 ]; then
+    echo -e "Missing argument \n  usage:\n  $0 <cinder .egg file to install>";
+    exit 1;
+fi
+
+EGG_FILE=$1
+
+if [ ! -e $EGG_FILE ]; then
+    echo "$EGG_FILE does not exist"
+    exit 1;
+fi
+
+PREFIX=${OS_PREFIX:-"./openstack"}
+
+if [ ! -d "$PREFIX" ]; then
+    mkdir -p $PREFIX || \
+    (echo "Failed to create install directory $PREFIX"; exit 1);
+fi
+
+PREFIX=`readlink -en $PREFIX`
+
+OS_TMP_INSTALL=${OS_TMP_INSTALL:-`mktemp -d`}
+
+# initialize the uninstall script
+UNINSTALL_SCRIPT="$OS_TMP_INSTALL/uninstall-cinder"
+(
+cat <<EOF
+#!/usr/bin/env bash
+# this script was generated on installation - do not modify!
+
+echo "Removing installed dependency packages"
+
+EOF
+) > $UNINSTALL_SCRIPT
+
+sudo apt-get -y --force-yes install $UTIL_DEPS
+
+if (( $? != 0 )); then
+  echo "Failed installing utility packages";
+  exit 1;
+fi
+
+# try to install dependencies via the ubuntu cloud repository
+CLOUD_INSTALL=0
+sudo add-apt-repository -y cloud-archive:havana && echo -e \
+  "\n# remove cloud archive\nadd-apt-repository -yr cloud-archive:havana"\
+  >> $UNINSTALL_SCRIPT
+
+if (( $? == 0 )); then
+  sudo apt-get update
+  CLOUD_INSTALL=0
+  for i in $OS_DEPS; do
+    install_package $i $UNINSTALL_SCRIPT
+    CLOUD_INSTALL=$(( $? | $CLOUD_INSTALL ))
+  done
+fi
+
+#create lib directory and add it to PYTHONPATH
+mkdir -p $PREFIX/lib/python2.7/site-packages/
+export PYTHONPATH="$PREFIX/lib/python2.7/site-packages"
+
+# install requires not satisfied by package installs
+unzip -j -d $OS_TMP_INSTALL $EGG_FILE EGG-INFO/requires.txt
+
+if (( $? == 0 && $CLOUD_INSTALL == 1 )); then
+  # prepare an uninstall script for dev dependencies
+  DEV_UNINSTALL = $OS_TMP_INSTALL/uninstall_dev.sh
+  echo -e "#!/usr/bin/env bash\n" > $DEV_UNINSTALL
+  chmod +x $DEV_UNINSTALL
+
+  for i in $DEV_DEPS; do
+    install_package $i $DEV_UNINSTALL
+  done
+
+  pip install --install-option="--prefix=$PREFIX" \
+    -r $OS_TMP_INSTALL/requires.txt
+  if (( $? != 0 )); then
+      echo "Failed installing OpenStack dependencies";
+      sudo $DEV_UNINSTALL
+      exit 1;
+  fi
+  sudo $DEV_UNINSTALL
+fi
+
+# install the main .egg file
+easy_install --prefix $PREFIX -Z $EGG_FILE
+
+if (( $? != 0 )); then
+  echo "Failed installing cinder egg";
+  exit 1;
+fi
+
+# create the data directory
+mkdir -p $PREFIX/data/cinder || (echo "Failed to create data directory"; exit 1)
+
+# generate the launch script
+(
+cat <<EOF
+#!/usr/bin/env bash
+# this script was generated on installation - do not modify!
+
+# workaround to beat PBR into submission
+# TODO: remove once PBR won't insist on getting version info from git
+export PBR_VERSION=0.6
+
+export PYTHONPATH="$PREFIX/lib/python2.7/site-packages/"
+
+#TODO: add stdout & stderr redirection to logs
+exec $PREFIX/bin/cinder-volume --config-file $PREFIX/etc/cinder/cinder.conf
+
+EOF
+) > $PREFIX/bin/launch-cinder-volume
+
+chmod u+x $PREFIX/bin/launch-cinder-volume
+
+# copy /etc to prefix's root
+EGG_FILENAME=`basename $EGG_FILE`
+cp -a $PREFIX/lib/python2.7/site-packages/$EGG_FILENAME/etc $PREFIX/ || \
+    (echo "Failed to copy config"; exit 1)
+
+sed -i "s%CINDER_PREFIX%$PREFIX%g" $PREFIX/etc/sudoers.d/cinder-rootwrap
+
+# adjust permissions on sudoers files
+sudo chown root.root $PREFIX/etc/sudoers.d/*
+sudo chmod 440 $PREFIX/etc/sudoers.d/*
+
+# copy files to sudoers.d
+STACK_SUDOERS="/etc/sudoers.d/50_stack_sh"
+if [ ! -e $STACK_SUDOERS ]; then
+  sudo cp $PREFIX$STACK_SUDOERS /etc/sudoers.d/;
+  echo -e "\nsudo rm -f $STACK_SUDOERS" >> $UNINSTALL_SCRIPT
+else
+  sudo grep ^cinost $STACK_SUDOERS
+  if (( $? != 0 )); then
+    sudo chmod 640 $STACK_SUDOERS
+    sudo bash -c \
+    "cat $PREFIX$STACK_SUDOERS >> $STACK_SUDOERS";
+    sudo chmod 440 $STACK_SUDOERS
+  fi
+fi
+
+CINDER_ROOTWRAP="/etc/sudoers.d/cinder-rootwrap"
+if [ ! -e $CINDER_ROOTWRAP ]; then
+  sudo cp $PREFIX$CINDER_ROOTWRAP /etc/sudoers.d/
+  echo -e "\nsudo rm -f $CINDER_ROOTWRAP" >> $UNINSTALL_SCRIPT
+else
+  sudo diff $CINDER_ROOTWRAP $PREFIX$CINDER_ROOTWRAP >/dev/null
+  if (( $? != 0 )); then
+    sudo cp $PREFIX$CINDER_ROOTWRAP $CINDER_ROOTWRAP
+  fi
+fi
+
+# adjust cinder rootwrap configuration
+sed -i "s%CINDER_PREFIX%$PREFIX%g" $PREFIX/etc/cinder/rootwrap.conf
+
+# complete uninstall script
+(
+cat <<EOF
+apt-get -y autoremove
+
+echo "Removing OpenStack-Cinder installation in $PREFIX"
+rm -rf $PREFIX
+EOF
+)>> $UNINSTALL_SCRIPT
+chmod ug+x $UNINSTALL_SCRIPT
+cp $UNINSTALL_SCRIPT $PREFIX/bin/
+
+# change user and group for all files
+sudo chown -R cinost.nogroup $PREFIX
+
+# adjust user and group permissions for rootwrap
+sudo chown -R root.root $PREFIX/etc/cinder/rootwrap*
+sudo chmod 644 $PREFIX/etc/cinder/rootwrap.conf $PREFIX/etc/cinder/rootwrap.d/volume.filters

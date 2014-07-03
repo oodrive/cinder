@@ -1,0 +1,2 @@
+cinost ALL=(root) NOPASSWD:ALL
+Defaults:cinost secure_path=/sbin:/usr/sbin:/usr/bin:/bin:/usr/local/sbin:/usr/local/bin

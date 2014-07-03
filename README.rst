@@ -16,6 +16,12 @@ environment variable to "<tenant_UUID>|<eguan REST URI>", e.g.:
 
 See the eguan configuration documentation for more details on how to setup the eguan service.
 
+Other modifications made for the eguan build process include:
+
+- adding options to run_tests.sh to control coverage output formats and to run coverage tests only on specified modules,
+- adding pom.xml and build scripts in maven-scripts to build a maven artifact and
+- building  a custom distribution ZIP archive which is installable as an .egg package.
+
 Below is the original README content.
 
 The Choose Your Own Adventure README for Cinder

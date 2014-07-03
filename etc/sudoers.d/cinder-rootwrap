@@ -1,0 +1,1 @@
+cinost ALL=(root) NOPASSWD: CINDER_PREFIX/bin/cinder-rootwrap CINDER_PREFIX/etc/cinder/rootwrap.conf *
