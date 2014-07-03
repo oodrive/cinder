@@ -1,3 +1,23 @@
+OpenStack Cinder - Eguan distribution
+*************************************
+
+This is the eguan distribution of OpenStack's Cinder block storage service.
+
+It adds the eguan storage backend volume driver and its unit tests:
+- the driver is in cinder/volume/drivers/eguan/
+- tests can be found at cinder/tests/test_eguan.py and associated mocks at cinder/tests/eguan/mocks.py
+
+Unit tests can be run against a live backend by setting the EGUAN_IT_BACKEND
+environment variable to "<tenant_UUID>|<eguan REST URI>", e.g.:
+
+::
+
+    export EGUAN_IT_BACKEND="fa753716fd1411e382fe180373e17099|https://eguan.example.com:8080/storage"
+
+See the eguan configuration documentation for more details on how to setup the eguan service.
+
+Below is the original README content.
+
 The Choose Your Own Adventure README for Cinder
 ===============================================
 
