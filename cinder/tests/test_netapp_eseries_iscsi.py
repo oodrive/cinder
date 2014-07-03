@@ -631,9 +631,14 @@ class NetAppEseriesIscsiDriverTestCase(test.TestCase):
     def _custom_setup(self):
         configuration = self._set_config(create_configuration())
         self.driver = common.NetAppDriver(configuration=configuration)
+        self._backup_session = requests.Session
         requests.Session = mock.Mock(wraps=FakeEseriesHTTPSession)
         self.driver.do_setup(context='context')
         self.driver.check_for_setup_error()
+
+    def tearDown(self):
+        super(NetAppEseriesIscsiDriverTestCase, self).tearDown()
+        requests.Session = self._backup_session
 
     def _set_config(self, configuration):
         configuration.netapp_storage_family = 'eseries'
