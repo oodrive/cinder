@@ -6,6 +6,7 @@ fixtures>=0.3.14,<=1.0.0
 hp3parclient>=3.0,<4.0
 hplefthandclient>=1.0.0,<2.0.0
 httmock==1.0.7
+junitxml==0.7
 mock>=1.0,<=1.0.1
 mox>=0.5.3,<=0.5.3
 MySQL-python<=1.2.5

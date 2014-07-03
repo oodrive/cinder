@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2
+                        http://maven.apache.org/xsd/assembly-1.1.2.xsd">
+    <id>openstack-cinder</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <baseDirectory>/</baseDirectory>
+
+    <fileSets>
+        <fileSet>
+            <directory>target/python-dist/cinder</directory>
+            <outputDirectory>cinder</outputDirectory>
+            <excludes>
+                <exclude>**/tests/**</exclude>
+                <exclude>**/test.py*</exclude>
+                <exclude>**/locale/**</exclude>
+            </excludes>
+        </fileSet>
+        <fileSet>
+            <directory>bin</directory>
+            <outputDirectory>EGG-INFO/scripts</outputDirectory>
+            <fileMode>775</fileMode>
+        </fileSet>
+        <fileSet>
+            <directory>target/python-dist/EGG-INFO</directory>
+            <excludes>
+                <exclude>scripts/*</exclude>
+            </excludes>
+            <outputDirectory>EGG-INFO</outputDirectory>
+        </fileSet>
+        <fileSet>
+            <directory>etc</directory>
+        </fileSet>
+    </fileSets>
+
+</assembly>
