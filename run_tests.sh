@@ -15,7 +15,10 @@ function usage {
   echo "  -u, --update                Update the virtual environment with any newer package versions"
   echo "  -p, --pep8                  Just run PEP8 and HACKING compliance check"
   echo "  -P, --no-pep8               Don't run static code checks"
-  echo "  -c, --coverage              Generate coverage report"
+  echo "  -c, --coverage <format>     Generate coverage report in xml or html format"
+  echo "                               Default: html"
+  echo "  --coverage-module <path>    Generate coverage only for the given module path, e.g. cinder/volume"
+  echo "                               Default: cinder"
   echo "  -d, --debug                 Run tests with testtools instead of testr. This allows you to use the debugger."
   echo "  -h, --help                  Print this usage message"
   echo "  --hide-elapsed              Don't print the elapsed time for each test along with slow test list"
@@ -48,7 +51,14 @@ function process_options {
       -u|--update) update=1;;
       -p|--pep8) just_pep8=1;;
       -P|--no-pep8) no_pep8=1;;
-      -c|--coverage) coverage=1;;
+      -c|--coverage)
+        (( i++ ))
+        coverage_format=${!i}
+	coverage=1;;
+      --coverage-module)
+        (( i++ ))
+        coverage_module=${!i}
+        ;;
       -d|--debug) debug=1;;
       --virtual-env-path)
         (( i++ ))
@@ -87,6 +97,8 @@ testropts=
 wrapper=""
 just_pep8=0
 no_pep8=0
+coverage_format="html"
+coverage_module="cinder"
 coverage=0
 debug=0
 recreate_db=1
@@ -156,10 +168,15 @@ function run_tests {
   copy_subunit_log
 
   if [ $coverage -eq 1 ]; then
-    echo "Generating coverage report in covhtml/"
+    echo "Generating coverage report/"
     # Don't compute coverage for common code, which is tested elsewhere
     ${wrapper} coverage combine
-    ${wrapper} coverage html --include='cinder/*' --omit='cinder/openstack/common/*' -d covhtml -i
+    if [ $coverage_format == "html" ]; then
+      ${wrapper} coverage html --include="$coverage_module/*" --omit='cinder/openstack/common/*' -d target/covhtml -i;
+    fi
+    if [ $coverage_format == "xml" ]; then
+      ${wrapper} coverage xml --include="$coverage_module/*" --omit='cinder/openstack/common/*' -o target/coverage.xml -i;
+    fi
   fi
 
   return $RESULT
