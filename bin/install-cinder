@@ -63,8 +63,8 @@ fi
 
 # try to install dependencies via the ubuntu cloud repository
 CLOUD_INSTALL=0
-sudo add-apt-repository -y cloud-archive:havana && echo -e \
-  "\n# remove cloud archive\nadd-apt-repository -yr cloud-archive:havana"\
+sudo add-apt-repository -y cloud-archive:icehouse && echo -e \
+  "\n# remove cloud archive\nadd-apt-repository -yr cloud-archive:icehouse"\
   >> $UNINSTALL_SCRIPT
 
 if (( $? == 0 )); then
